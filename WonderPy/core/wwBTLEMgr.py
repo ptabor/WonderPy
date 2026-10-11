@@ -363,7 +363,15 @@ class WWBTLEManager:
             connect_task = cls.connect_task
             async def stop_task():
                 connect_task.cancel()
+                try:
+                    await connect_task
+                except (asyncio.CancelledError, Exception):
+                    pass
 
-            asyncio.run_coroutine_threadsafe(stop_task(), bleak_loop)
+            fut = asyncio.run_coroutine_threadsafe(stop_task(), bleak_loop)
+            try:
+                fut.result(timeout=4.0)
+            except Exception:
+                pass
             cls.connect_task = None
             cls.bleak_loop = None
