@@ -64,6 +64,13 @@ class WWBTLEManager:
             parser = argparse.ArgumentParser(description='Options.')
             WWBTLEManager.setup_argument_parser(parser)
             arguments = parser.parse_args()
+        elif isinstance(arguments, (list, tuple)):
+            parser = argparse.ArgumentParser(description='Options.')
+            WWBTLEManager.setup_argument_parser(parser)
+            arg_list = list(arguments)
+            if arg_list and (arg_list[0].endswith('.py') or arg_list[0] == sys.argv[0]):
+                arg_list = arg_list[1:]
+            arguments = parser.parse_args(arg_list)
 
         self._args = arguments
 
@@ -258,7 +265,8 @@ class WWBTLEManager:
             self.client = BleakClient(device[0].address)
             await self.client.connect()
 
-            await self._send_connection_interval_renegotiation()
+            # Skipping renegotiation on macOS BLE / Bleak as Dot firmware stalls after 10 packets
+            # await self._send_connection_interval_renegotiation()
 
             # Setup notification callbacks
             async def on_data_sensor(sender: BleakGATTCharacteristic, data: bytearray):
@@ -308,10 +316,14 @@ class WWBTLEManager:
                 while True:
                     await asyncio.sleep(1)
             finally:
-                await self.client.stop_notify(CHAR_UUID_SENSOR0)
-                if self.robot.expect_sensor_packet_2:
-                    await self.client.stop_notify(CHAR_UUID_SENSOR1)
-                await self.client.disconnect()
+                try:
+                    if self.client and self.client.is_connected:
+                        await self.client.stop_notify(CHAR_UUID_SENSOR0)
+                        if self.robot.expect_sensor_packet_2:
+                            await self.client.stop_notify(CHAR_UUID_SENSOR1)
+                        await self.client.disconnect()
+                except Exception:
+                    pass
         except (KeyboardInterrupt, asyncio.CancelledError):
             sys.stdout.write('Stopping...\n')
             sys.stdout.flush()
