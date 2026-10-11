@@ -256,7 +256,8 @@ class WWBTLEManager:
             # Create a wrapper to call async sendJson from sync context
             def sync_sendJson(json_dict):
                 # NOTE: The caller does not block for this to complete.
-                asyncio.run_coroutine_threadsafe(self.sendJson(json_dict), self.bleak_loop) # type: ignore
+                if self.bleak_loop is not None and self.bleak_loop.is_running():
+                    asyncio.run_coroutine_threadsafe(self.sendJson(json_dict), self.bleak_loop) # type: ignore
             self.robot._sendJson = sync_sendJson
 
             print('Connecting to ' + self.robot.robot_type_name + ' "%s"' % (self.robot.name))
